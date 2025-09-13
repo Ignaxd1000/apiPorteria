@@ -6,69 +6,71 @@ class ControladorAlumnos {
 
     // Consultar alumno usando solo token
     public function buscarPorToken($token) {
-    if (!$token) {
-        echo json_encode(["status" => 400, "mensaje" => "Token vacío"]);
-        return;
+        try {
+            // Validar token
+            $token = ValidationHelper::validateToken($token);
+            
+            if (!ModeloAlumnos::validarToken($token)) {
+                ResponseHelper::forbidden("Token inválido");
+            }
+
+            $alumno = ModeloAlumnos::buscarPorToken($token);
+
+            if (!$alumno) {
+                ResponseHelper::notFound("Alumno no encontrado");
+            }
+
+            ResponseHelper::success([
+                "alumno" => [
+                    "legajo" => $alumno["legajo"],
+                    "nombres" => $alumno["nombres"] ?? "Desconocido",
+                    "dni" => $alumno["dni"] ?? "Desconocido",
+                    "foto" => "alumnos/foto/" . $alumno["legajo"] . "?token=" . $token
+                ]
+            ]);
+            
+        } catch (Exception $e) {
+            ResponseHelper::badRequest($e->getMessage());
+        }
     }
-
-    if (!ModeloAlumnos::validarToken($token)) {
-        echo json_encode(["status" => 403, "mensaje" => "Token inválido"]);
-        return;
-    }
-
-    $alumno = ModeloAlumnos::buscarPorToken($token);
-
-    if (!$alumno) {
-        echo json_encode(["status" => 404, "mensaje" => "Alumno no encontrado"]);
-        return;
-    }
-
-    echo json_encode([
-        "status" => 200,
-        "alumno" => [
-            "legajo" => $alumno["legajo"],
-            "nombres" => $alumno["nombres"] ?? "Desconocido",
-            "dni" => $alumno["dni"] ?? "Desconocido",
-            "foto" => "alumnos/foto/" . $alumno["legajo"] . "?token=" . $token
-        ]
-    ]);
-}
-
 
     // Obtener foto de alumno usando legajo y token
     public function obtenerFoto($legajo, $token) {
-        if (!ModeloAlumnos::validarToken($token)) {
-            header("HTTP/1.1 403 Forbidden");
-            echo json_encode(["status" => 403, "mensaje" => "Token inválido"]);
+        try {
+            // Validar inputs
+            $legajo = ValidationHelper::validateLegajo($legajo);
+            $token = ValidationHelper::validateToken($token);
+            
+            if (!ModeloAlumnos::validarToken($token)) {
+                ResponseHelper::forbidden("Token inválido");
+            }
+
+            $alumno = ModeloAlumnos::buscarPorLegajo($legajo);
+
+            if (!$alumno || empty($alumno['foto'])) {
+                ResponseHelper::notFound("Imagen no encontrada");
+            }
+
+            $ruta = __DIR__ . "/../fotos/" . $alumno['foto'];
+            if (!file_exists($ruta)) {
+                ResponseHelper::notFound("Imagen no encontrada");
+            }
+
+            $ext = strtolower(pathinfo($ruta, PATHINFO_EXTENSION));
+            $mime = match($ext) {
+                "png" => "image/png",
+                default => "image/jpeg",
+            };
+
+            header("Content-Type: $mime");
+            header("Content-Length: " . filesize($ruta));
+            readfile($ruta);
             exit;
+            
+        } catch (Exception $e) {
+            ResponseHelper::badRequest($e->getMessage());
         }
-
-        $alumno = ModeloAlumnos::buscarPorLegajo($legajo);
-
-        if (!$alumno || empty($alumno['foto'])) {
-            header("HTTP/1.1 404 Not Found");
-            echo json_encode(["status" => 404, "mensaje" => "Imagen no encontrada"]);
-            exit;
-        }
-
-        $ruta = __DIR__ . "/../fotos/" . $alumno['foto'];
-        if (!file_exists($ruta)) {
-            header("HTTP/1.1 404 Not Found");
-            echo json_encode(["status" => 404, "mensaje" => "Imagen no encontrada"]);
-            exit;
-        }
-
-        $ext = strtolower(pathinfo($ruta, PATHINFO_EXTENSION));
-        $mime = match($ext) {
-            "png" => "image/png",
-            default => "image/jpeg",
-        };
-
-        header("Content-Type: $mime");
-        header("Content-Length: " . filesize($ruta));
-        readfile($ruta);
-        exit;
     }
 }
 
-
+?>
