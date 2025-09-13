@@ -1,5 +1,7 @@
 <?php
 
+    require_once "helpers/response.php";
+    require_once "helpers/validation.php";
     require_once "controllers/routes.controllers.php";
     require_once "controllers/cursos.controller.php";
     require_once "controllers/clientes.controller.php";
