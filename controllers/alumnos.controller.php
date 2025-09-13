@@ -10,21 +10,22 @@ class ControladorAlumnos {
             // Validar token
             $token = ValidationHelper::validateToken($token);
             
-            if (!ModeloAlumnos::validarToken($token)) {
-                ResponseHelper::forbidden("Token inválido");
-            }
-
+            // Buscar alumno por token en una sola consulta
             $alumno = ModeloAlumnos::buscarPorToken($token);
 
             if (!$alumno) {
-                ResponseHelper::notFound("Alumno no encontrado");
+                ResponseHelper::notFound("Alumno no encontrado o token inválido");
             }
+
+            // Determinar si pertenece a la institución basado en el campo 'activo'
+            $pertenece = !empty($alumno["activo"]) && $alumno["activo"] == 1;
 
             ResponseHelper::success([
                 "alumno" => [
                     "legajo" => $alumno["legajo"],
                     "nombres" => $alumno["nombres"] ?? "Desconocido",
                     "dni" => $alumno["dni"] ?? "Desconocido",
+                    "pertenece" => $pertenece,
                     "foto" => "alumnos/foto/" . $alumno["legajo"] . "?token=" . $token
                 ]
             ]);
@@ -41,13 +42,19 @@ class ControladorAlumnos {
             $legajo = ValidationHelper::validateLegajo($legajo);
             $token = ValidationHelper::validateToken($token);
             
-            if (!ModeloAlumnos::validarToken($token)) {
+            // Buscar alumno por token para validar y obtener datos
+            $alumno = ModeloAlumnos::buscarPorToken($token);
+            
+            if (!$alumno) {
                 ResponseHelper::forbidden("Token inválido");
             }
 
-            $alumno = ModeloAlumnos::buscarPorLegajo($legajo);
+            // Verificar que el legajo coincida con el del token (seguridad mejorada)
+            if ($alumno['legajo'] !== $legajo) {
+                ResponseHelper::forbidden("Legajo no coincide con el token");
+            }
 
-            if (!$alumno || empty($alumno['foto'])) {
+            if (empty($alumno['foto'])) {
                 ResponseHelper::notFound("Imagen no encontrada");
             }
 
@@ -55,6 +62,9 @@ class ControladorAlumnos {
             if (!file_exists($ruta)) {
                 ResponseHelper::notFound("Imagen no encontrada");
             }
+
+            // Registrar acceso (logging básico)
+            $this->registrarAccesoFoto($legajo, $token);
 
             $ext = strtolower(pathinfo($ruta, PATHINFO_EXTENSION));
             $mime = match($ext) {
@@ -69,6 +79,30 @@ class ControladorAlumnos {
             
         } catch (Exception $e) {
             ResponseHelper::badRequest($e->getMessage());
+        }
+    }
+
+    // Método para registrar accesos a fotos (logging básico)
+    private function registrarAccesoFoto($legajo, $token) {
+        try {
+            $logFile = __DIR__ . "/../logs/acceso_fotos.log";
+            $logDir = dirname($logFile);
+            
+            // Crear directorio de logs si no existe
+            if (!file_exists($logDir)) {
+                mkdir($logDir, 0755, true);
+            }
+            
+            $fecha = date('Y-m-d H:i:s');
+            $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+            $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'unknown';
+            
+            $logEntry = "[{$fecha}] Acceso a foto - Legajo: {$legajo}, IP: {$ip}, UserAgent: {$userAgent}" . PHP_EOL;
+            
+            file_put_contents($logFile, $logEntry, FILE_APPEND | LOCK_EX);
+        } catch (Exception $e) {
+            // Si falla el logging, no interrumpir el flujo principal
+            error_log("Error en logging de acceso a foto: " . $e->getMessage());
         }
     }
 }

@@ -33,11 +33,11 @@ class ModeloAlumnos {
     }
 
     public static function buscarPorToken($token) {
-    $db = Conexion::conectar();
-    $stmt = $db->prepare("SELECT legajo, nombres, dni, foto FROM alu_alumnos WHERE qr_code = ?");
-    $stmt->execute([$token]);
-    return $stmt->fetch(PDO::FETCH_ASSOC);
-}
+        $db = Conexion::conectar();
+        $stmt = $db->prepare("SELECT legajo, nombres, dni, foto, activo FROM alu_alumnos WHERE qr_code = ?");
+        $stmt->execute([$token]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
 
 
 }
