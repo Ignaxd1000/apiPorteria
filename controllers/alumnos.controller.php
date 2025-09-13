@@ -49,8 +49,8 @@ class ControladorAlumnos {
                 ResponseHelper::forbidden("Token inválido");
             }
 
-            // Verificar que el legajo coincida con el del token (seguridad mejorada)
-            if ($alumno['legajo'] !== $legajo) {
+            // Corregi esto de acà, Copilot estaba comparando mal y por eso no se devolvia la foto
+            if ((int)$alumno['legajo'] !== (int)$legajo) {{
                 ResponseHelper::forbidden("Legajo no coincide con el token");
             }
 
