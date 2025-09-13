@@ -1,2 +1,2 @@
-*.json # No queremos que se filtren las claves no?
+config/config.json
 logs/
