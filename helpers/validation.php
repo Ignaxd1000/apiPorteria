@@ -1,8 +1,5 @@
 <?php
 
-/**
- * Helper class for input validation and sanitization
- */
 class ValidationHelper {
     
     /**
@@ -203,6 +200,17 @@ class ValidationHelper {
         }
         
         return $data;
+    }
+
+    public static function validateKey($key) {
+        if (empty($key) {
+            throw new Exception("Error de clave");
+            }
+
+        /** Deberia añadir la verificación del OAuth acá, pero para eso hay que esperar a Amdel **/
+         return True;
+
+        }
     }
 }
 
