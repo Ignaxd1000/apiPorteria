@@ -39,6 +39,13 @@ class ModeloAlumnos {
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
+    public static function getTokenByDni($dni) {
+        $db = Conexion::conectar();
+        $stmt = $db->prepare("SELECT qr_code FROM alu_alumnos WHERE dni = ?");
+        $stmt->execute([$dni]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ? $result['qr_code'] : null;
+    }
 
 }
 
