@@ -5,35 +5,68 @@ header('Content-Type: application/json');
 // Security: Maximum payload size (1MB)
 define('MAX_PAYLOAD_SIZE', 1048576);
 
+// Cache php://input as it can only be read once
+$rawInput = file_get_contents("php://input");
+
+// Helper function to handle JSON input with caching
+// Caches parsed JSON to avoid redundant json_decode() calls within the same request
+// (e.g., once in authentication validation, once in route handler)
+function getJsonInput($rawInput) {
+    static $parsedInput = null;
+    static $cachedRawInput = null;
+    
+    // Parse only if this is the first call or input has changed
+    if ($cachedRawInput !== $rawInput) {
+        $cachedRawInput = $rawInput;
+        $parsedInput = ValidationHelper::validateJsonInput($rawInput);
+    }
+    
+    return $parsedInput;
+}
+
+// Helper function to handle PUT data with caching
+// Caches parsed data to avoid redundant parsing within the same request
+function getPutData($rawInput) {
+    static $putData = null;
+    static $cachedRawInput = null;
+    
+    // Parse only if this is the first call or input has changed
+    if ($cachedRawInput !== $rawInput) {
+        $cachedRawInput = $rawInput;
+        parse_str($rawInput, $putData);
+        if (empty($putData)) {
+            // Try JSON format as fallback
+            $putData = ValidationHelper::validateJsonInput($rawInput);
+        }
+    }
+    
+    return $putData;
+}
+
 $arrayRutas = array_values(array_filter(explode("/", $_SERVER['REQUEST_URI'])));
 
 // Ajustar según el prefijo de la API (ej: api29-main)
 $baseIndex = array_search('api29-main', $arrayRutas);
 $rutas = array_slice($arrayRutas, $baseIndex + 1);
 
-// Rutas que NO requieren autenticación
+// Rutas que NO requieren autenticación - optimized with route keys for O(1) lookup
 $publicRoutes = [
-    ['path' => ['alumnos', 'token'], 'method' => 'POST'],
-    ['path' => ['clientes'], 'method' => 'POST'] // Permitir crear clientes sin autenticación
+    'POST:/alumnos/token' => true,  // Exactly 2 segments
+    'POST:/clientes' => true        // Exactly 1 segment
 ];
 
-// Verificar si la ruta actual es pública
+// Verificar si la ruta actual es pública - optimized route matching
+// Build route keys and check against public routes (only if rutas is not empty)
 $isPublicRoute = false;
-foreach ($publicRoutes as $publicRoute) {
-    if (count($rutas) >= count($publicRoute['path'])) {
-        $match = true;
-        for ($i = 0; $i < count($publicRoute['path']); $i++) {
-            if ($rutas[$i] !== $publicRoute['path'][$i]) {
-                $match = false;
-                break;
-            }
-        }
-        if ($match && $_SERVER['REQUEST_METHOD'] === $publicRoute['method']) {
-            $isPublicRoute = true;
-            break;
-        }
-    }
+if (!empty($rutas)) {
+    $currentRouteKey2 = $_SERVER['REQUEST_METHOD'] . ':/' . implode('/', array_slice($rutas, 0, 2));
+    $currentRouteKey1 = $_SERVER['REQUEST_METHOD'] . ':/' . $rutas[0];
+    
+    // Check if current route matches public routes with correct depth
+    $isPublicRoute = (count($rutas) === 1 && isset($publicRoutes[$currentRouteKey1])) || 
+                     (count($rutas) >= 2 && isset($publicRoutes[$currentRouteKey2]));
 }
+
 
 // Autenticación: validar credenciales si no es una ruta pública
 if (!$isPublicRoute && !empty($rutas)) {
@@ -50,7 +83,7 @@ if (!$isPublicRoute && !empty($rutas)) {
                 ResponseHelper::badRequest("Payload demasiado grande");
             }
             
-            $inputData = json_decode(file_get_contents("php://input"), true);
+            $inputData = json_decode($rawInput, true);
             if (is_array($inputData)) {
                 $id_cliente = $inputData['id_cliente'] ?? $id_cliente;
                 $llave_secreta = $inputData['llave_secreta'] ?? $llave_secreta;
@@ -100,7 +133,7 @@ switch ($rutas[0]) {
                 $cursos->index(null);
             } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 try {
-                    $datos = ValidationHelper::validateJsonInput(file_get_contents("php://input"));
+                    $datos = getJsonInput($rawInput);
                     $cursos->create($datos);
                 } catch (Exception $e) {
                     ResponseHelper::badRequest($e->getMessage());
@@ -115,12 +148,7 @@ switch ($rutas[0]) {
                 $cursos->show($idCurso);
             } elseif ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 try {
-                    $datos = [];
-                    parse_str(file_get_contents('php://input'), $datos);
-                    if (empty($datos)) {
-                        // Try JSON format as fallback
-                        $datos = ValidationHelper::validateJsonInput(file_get_contents("php://input"));
-                    }
+                    $datos = getPutData($rawInput);
                     $cursos->update($idCurso, $datos);
                 } catch (Exception $e) {
                     ResponseHelper::badRequest($e->getMessage());
@@ -143,7 +171,7 @@ switch ($rutas[0]) {
                 $clientes->index();
             } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 try {
-                    $datos = ValidationHelper::validateJsonInput(file_get_contents("php://input"));
+                    $datos = getJsonInput($rawInput);
                     $clientes->create($datos);
                 } catch (Exception $e) {
                     ResponseHelper::badRequest($e->getMessage());
@@ -163,7 +191,7 @@ switch ($rutas[0]) {
             // /alumnos - POST: buscar solo por token
             if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 try {
-                    $datos = ValidationHelper::validateJsonInput(file_get_contents("php://input"));
+                    $datos = getJsonInput($rawInput);
                     if (!isset($datos["token"])) {
                         ResponseHelper::badRequest("Token requerido");
                     }
@@ -178,7 +206,7 @@ switch ($rutas[0]) {
             // /alumnos/token - POST: obtener token por DNI (sin autenticación)
             if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 try {
-                    $datos = ValidationHelper::validateJsonInput(file_get_contents("php://input"));
+                    $datos = getJsonInput($rawInput);
                     $alumnos->getTokenByDNI($datos);
                 } catch (Exception $e) {
                     ResponseHelper::badRequest($e->getMessage());
