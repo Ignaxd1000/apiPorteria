@@ -2,6 +2,9 @@
 
 header('Content-Type: application/json');
 
+// Security: Maximum payload size (1MB)
+define('MAX_PAYLOAD_SIZE', 1048576);
+
 $arrayRutas = array_values(array_filter(explode("/", $_SERVER['REQUEST_URI'])));
 
 // Ajustar según el prefijo de la API (ej: api29-main)
@@ -43,7 +46,7 @@ if (!$isPublicRoute && !empty($rutas)) {
         if ((!$id_cliente || !$llave_secreta) && in_array($_SERVER['REQUEST_METHOD'], ['POST', 'PUT'])) {
             // Security: Check content length to prevent large payload attacks
             $contentLength = $_SERVER['CONTENT_LENGTH'] ?? 0;
-            if ($contentLength > 1048576) { // 1MB limit
+            if ($contentLength > MAX_PAYLOAD_SIZE) {
                 ResponseHelper::badRequest("Payload demasiado grande");
             }
             

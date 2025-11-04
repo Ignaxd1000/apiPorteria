@@ -45,6 +45,7 @@ class ModeloAlumnos {
         $stmt->bindParam(":dni", $dni, PDO::PARAM_STR);
         $stmt->execute();
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stmt = null;
         return $result ? $result['qr_code'] : null;
     }
 
