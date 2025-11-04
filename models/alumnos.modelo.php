@@ -41,8 +41,9 @@ class ModeloAlumnos {
 
     public static function getTokenByDni($dni) {
         $db = Conexion::conectar();
-        $stmt = $db->prepare("SELECT qr_code FROM alu_alumnos WHERE dni = ?");
-        $stmt->execute([$dni]);
+        $stmt = $db->prepare("SELECT qr_code FROM alu_alumnos WHERE dni = :dni");
+        $stmt->bindParam(":dni", $dni, PDO::PARAM_STR);
+        $stmt->execute();
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         return $result ? $result['qr_code'] : null;
     }

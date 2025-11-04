@@ -41,6 +41,12 @@ if (!$isPublicRoute && !empty($rutas)) {
         
         // Si no están en headers, intentar desde el cuerpo JSON (para POST/PUT)
         if ((!$id_cliente || !$llave_secreta) && in_array($_SERVER['REQUEST_METHOD'], ['POST', 'PUT'])) {
+            // Security: Check content length to prevent large payload attacks
+            $contentLength = $_SERVER['CONTENT_LENGTH'] ?? 0;
+            if ($contentLength > 1048576) { // 1MB limit
+                ResponseHelper::badRequest("Payload demasiado grande");
+            }
+            
             $inputData = json_decode(file_get_contents("php://input"), true);
             if (is_array($inputData)) {
                 $id_cliente = $inputData['id_cliente'] ?? $id_cliente;

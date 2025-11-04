@@ -204,8 +204,8 @@ class ValidationHelper {
     
     /**
      * Authenticate client credentials
-     * @param string $id_cliente Client ID (username/hash)
-     * @param string $llave_secreta Secret key (password/hash)
+     * @param string $id_cliente Client ID (hashed username - received as hash)
+     * @param string $llave_secreta Secret key (hashed password - received as hash)
      * @return bool True if authentication succeeds
      * @throws Exception if authentication fails
      */
