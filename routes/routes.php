@@ -16,14 +16,22 @@ $rutas = array_slice($arrayRutas, $baseIndex + 1);
 
 // Rutas que NO requieren autenticación - optimized with route keys for O(1) lookup
 $publicRoutes = [
-    'POST:/alumnos/token' => true,
-    'POST:/clientes' => true
+    'POST:/alumnos/token' => true,  // Exactly 2 segments
+    'POST:/clientes' => true        // Exactly 1 segment
 ];
 
 // Verificar si la ruta actual es pública - optimized route matching
-$currentRouteKey = $_SERVER['REQUEST_METHOD'] . ':/' . implode('/', array_slice($rutas, 0, 2));
-$currentRouteKeySingle = $_SERVER['REQUEST_METHOD'] . ':/' . ($rutas[0] ?? '');
-$isPublicRoute = isset($publicRoutes[$currentRouteKey]) || isset($publicRoutes[$currentRouteKeySingle]);
+// Build route keys for both possible depths and check against public routes
+$currentRouteKey2 = $_SERVER['REQUEST_METHOD'] . ':/' . implode('/', array_slice($rutas, 0, 2));
+$currentRouteKey1 = $_SERVER['REQUEST_METHOD'] . ':/' . ($rutas[0] ?? '');
+
+// Check if current route matches public routes with correct depth
+$isPublicRoute = false;
+if (count($rutas) === 1 && isset($publicRoutes[$currentRouteKey1])) {
+    $isPublicRoute = true;
+} elseif (count($rutas) >= 2 && isset($publicRoutes[$currentRouteKey2])) {
+    $isPublicRoute = true;
+}
 
 
 // Autenticación: validar credenciales si no es una ruta pública
@@ -82,12 +90,13 @@ if (!in_array($rutas[0], $validRoutes)) {
 }
 
 // Helper function to handle JSON input with caching
-// Note: This caches the parsed input since $rawInput is constant per request
+// Caches parsed JSON to avoid redundant json_decode() calls within the same request
+// (e.g., once in authentication validation, once in route handler)
 function getJsonInput($rawInput) {
     static $parsedInput = null;
     static $cachedRawInput = null;
     
-    // Only use cache if we're parsing the same raw input
+    // Parse only if this is the first call or input has changed
     if ($cachedRawInput !== $rawInput) {
         $cachedRawInput = $rawInput;
         $parsedInput = ValidationHelper::validateJsonInput($rawInput);
@@ -97,12 +106,12 @@ function getJsonInput($rawInput) {
 }
 
 // Helper function to handle PUT data with caching
-// Note: This caches the parsed input since $rawInput is constant per request
+// Caches parsed data to avoid redundant parsing within the same request
 function getPutData($rawInput) {
     static $putData = null;
     static $cachedRawInput = null;
     
-    // Only use cache if we're parsing the same raw input
+    // Parse only if this is the first call or input has changed
     if ($cachedRawInput !== $rawInput) {
         $cachedRawInput = $rawInput;
         parse_str($rawInput, $putData);
