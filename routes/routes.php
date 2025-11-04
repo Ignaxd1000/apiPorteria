@@ -8,6 +8,41 @@ define('MAX_PAYLOAD_SIZE', 1048576);
 // Cache php://input as it can only be read once
 $rawInput = file_get_contents("php://input");
 
+// Helper function to handle JSON input with caching
+// Caches parsed JSON to avoid redundant json_decode() calls within the same request
+// (e.g., once in authentication validation, once in route handler)
+function getJsonInput($rawInput) {
+    static $parsedInput = null;
+    static $cachedRawInput = null;
+    
+    // Parse only if this is the first call or input has changed
+    if ($cachedRawInput !== $rawInput) {
+        $cachedRawInput = $rawInput;
+        $parsedInput = ValidationHelper::validateJsonInput($rawInput);
+    }
+    
+    return $parsedInput;
+}
+
+// Helper function to handle PUT data with caching
+// Caches parsed data to avoid redundant parsing within the same request
+function getPutData($rawInput) {
+    static $putData = null;
+    static $cachedRawInput = null;
+    
+    // Parse only if this is the first call or input has changed
+    if ($cachedRawInput !== $rawInput) {
+        $cachedRawInput = $rawInput;
+        parse_str($rawInput, $putData);
+        if (empty($putData)) {
+            // Try JSON format as fallback
+            $putData = ValidationHelper::validateJsonInput($rawInput);
+        }
+    }
+    
+    return $putData;
+}
+
 $arrayRutas = array_values(array_filter(explode("/", $_SERVER['REQUEST_URI'])));
 
 // Ajustar según el prefijo de la API (ej: api29-main)
@@ -21,16 +56,15 @@ $publicRoutes = [
 ];
 
 // Verificar si la ruta actual es pública - optimized route matching
-// Build route keys for both possible depths and check against public routes
-$currentRouteKey2 = $_SERVER['REQUEST_METHOD'] . ':/' . implode('/', array_slice($rutas, 0, 2));
-$currentRouteKey1 = $_SERVER['REQUEST_METHOD'] . ':/' . ($rutas[0] ?? '');
-
-// Check if current route matches public routes with correct depth
+// Build route keys and check against public routes (only if rutas is not empty)
 $isPublicRoute = false;
-if (count($rutas) === 1 && isset($publicRoutes[$currentRouteKey1])) {
-    $isPublicRoute = true;
-} elseif (count($rutas) >= 2 && isset($publicRoutes[$currentRouteKey2])) {
-    $isPublicRoute = true;
+if (!empty($rutas)) {
+    $currentRouteKey2 = $_SERVER['REQUEST_METHOD'] . ':/' . implode('/', array_slice($rutas, 0, 2));
+    $currentRouteKey1 = $_SERVER['REQUEST_METHOD'] . ':/' . $rutas[0];
+    
+    // Check if current route matches public routes with correct depth
+    $isPublicRoute = (count($rutas) === 1 && isset($publicRoutes[$currentRouteKey1])) || 
+                     (count($rutas) >= 2 && isset($publicRoutes[$currentRouteKey2]));
 }
 
 
@@ -87,41 +121,6 @@ if (empty($rutas)) {
 $validRoutes = ['cursos', 'clientes', 'alumnos'];
 if (!in_array($rutas[0], $validRoutes)) {
     ResponseHelper::notFound("Ruta no encontrada");
-}
-
-// Helper function to handle JSON input with caching
-// Caches parsed JSON to avoid redundant json_decode() calls within the same request
-// (e.g., once in authentication validation, once in route handler)
-function getJsonInput($rawInput) {
-    static $parsedInput = null;
-    static $cachedRawInput = null;
-    
-    // Parse only if this is the first call or input has changed
-    if ($cachedRawInput !== $rawInput) {
-        $cachedRawInput = $rawInput;
-        $parsedInput = ValidationHelper::validateJsonInput($rawInput);
-    }
-    
-    return $parsedInput;
-}
-
-// Helper function to handle PUT data with caching
-// Caches parsed data to avoid redundant parsing within the same request
-function getPutData($rawInput) {
-    static $putData = null;
-    static $cachedRawInput = null;
-    
-    // Parse only if this is the first call or input has changed
-    if ($cachedRawInput !== $rawInput) {
-        $cachedRawInput = $rawInput;
-        parse_str($rawInput, $putData);
-        if (empty($putData)) {
-            // Try JSON format as fallback
-            $putData = ValidationHelper::validateJsonInput($rawInput);
-        }
-    }
-    
-    return $putData;
 }
 
 // Rutas principales
