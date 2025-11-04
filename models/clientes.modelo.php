@@ -37,6 +37,22 @@ class ModeloClientes{
         
     }
 
+    static public function getClientByCredentials($id_cliente, $llave_secreta){
+        // Note: Credentials are already stored as hashes in the database
+        // We compare hash to hash directly as per the requirements
+        $stmt = Conexion::conectar()->prepare("SELECT * FROM clientes WHERE id_cliente = :id_cliente AND llave_secreta = :llave_secreta");
+        
+        $stmt->bindParam(":id_cliente", $id_cliente, PDO::PARAM_STR);
+        $stmt->bindParam(":llave_secreta", $llave_secreta, PDO::PARAM_STR);
+        
+        $stmt->execute();
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        $stmt = null;
+        
+        return $result;
+    }
+
 }
 
 ?>

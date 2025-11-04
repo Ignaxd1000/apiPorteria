@@ -50,7 +50,7 @@ class ControladorAlumnos {
             }
 
             // Corregi esto de acà, Copilot estaba comparando mal y por eso no se devolvia la foto
-            if ((int)$alumno['legajo'] !== (int)$legajo) {{
+            if ((int)$alumno['legajo'] !== (int)$legajo) {
                 ResponseHelper::forbidden("Legajo no coincide con el token");
             }
 
@@ -103,6 +103,33 @@ class ControladorAlumnos {
         } catch (Exception $e) {
             // Si falla el logging, no interrumpir el flujo principal
             error_log("Error en logging de acceso a foto: " . $e->getMessage());
+        }
+    }
+
+    // Obtener token de alumno por DNI (sin autenticación requerida)
+    public function getTokenByDNI($datos) {
+        try {
+            // Validar que el DNI esté presente
+            if (!isset($datos["dni"])) {
+                ResponseHelper::badRequest("DNI requerido");
+            }
+            
+            // Validar formato del DNI
+            $dni = ValidationHelper::validateDNI($datos["dni"]);
+            
+            // Buscar token por DNI
+            $token = ModeloAlumnos::getTokenByDni($dni);
+            
+            if (!$token) {
+                ResponseHelper::notFound("Alumno no encontrado");
+            }
+            
+            ResponseHelper::success([
+                "token" => $token
+            ]);
+            
+        } catch (Exception $e) {
+            ResponseHelper::badRequest($e->getMessage());
         }
     }
 }

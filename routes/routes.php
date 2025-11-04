@@ -2,11 +2,72 @@
 
 header('Content-Type: application/json');
 
+// Security: Maximum payload size (1MB)
+define('MAX_PAYLOAD_SIZE', 1048576);
+
 $arrayRutas = array_values(array_filter(explode("/", $_SERVER['REQUEST_URI'])));
 
 // Ajustar según el prefijo de la API (ej: api29-main)
 $baseIndex = array_search('api29-main', $arrayRutas);
 $rutas = array_slice($arrayRutas, $baseIndex + 1);
+
+// Rutas que NO requieren autenticación
+$publicRoutes = [
+    ['path' => ['alumnos', 'token'], 'method' => 'POST'],
+    ['path' => ['clientes'], 'method' => 'POST'] // Permitir crear clientes sin autenticación
+];
+
+// Verificar si la ruta actual es pública
+$isPublicRoute = false;
+foreach ($publicRoutes as $publicRoute) {
+    if (count($rutas) >= count($publicRoute['path'])) {
+        $match = true;
+        for ($i = 0; $i < count($publicRoute['path']); $i++) {
+            if ($rutas[$i] !== $publicRoute['path'][$i]) {
+                $match = false;
+                break;
+            }
+        }
+        if ($match && $_SERVER['REQUEST_METHOD'] === $publicRoute['method']) {
+            $isPublicRoute = true;
+            break;
+        }
+    }
+}
+
+// Autenticación: validar credenciales si no es una ruta pública
+if (!$isPublicRoute && !empty($rutas)) {
+    try {
+        // Obtener credenciales desde los headers
+        $id_cliente = $_SERVER['HTTP_X_CLIENT_ID'] ?? null;
+        $llave_secreta = $_SERVER['HTTP_X_SECRET_KEY'] ?? null;
+        
+        // Si no están en headers, intentar desde el cuerpo JSON (para POST/PUT)
+        if ((!$id_cliente || !$llave_secreta) && in_array($_SERVER['REQUEST_METHOD'], ['POST', 'PUT'])) {
+            // Security: Check content length to prevent large payload attacks
+            $contentLength = $_SERVER['CONTENT_LENGTH'] ?? 0;
+            if ($contentLength > MAX_PAYLOAD_SIZE) {
+                ResponseHelper::badRequest("Payload demasiado grande");
+            }
+            
+            $inputData = json_decode(file_get_contents("php://input"), true);
+            if (is_array($inputData)) {
+                $id_cliente = $inputData['id_cliente'] ?? $id_cliente;
+                $llave_secreta = $inputData['llave_secreta'] ?? $llave_secreta;
+            }
+        }
+        
+        if (!$id_cliente || !$llave_secreta) {
+            ResponseHelper::unauthorized("Credenciales requeridas. Envíe id_cliente y llave_secreta en headers (X-Client-Id, X-Secret-Key) o en el cuerpo de la petición");
+        }
+        
+        // Validar credenciales
+        ValidationHelper::authenticateClient($id_cliente, $llave_secreta);
+        
+    } catch (Exception $e) {
+        ResponseHelper::unauthorized($e->getMessage());
+    }
+}
 
 // Manejo de paginación para cursos vía GET (?pagina=)
 if (isset($_GET["pagina"]) && !empty($rutas) && $rutas[0] === 'cursos') {
@@ -107,6 +168,18 @@ switch ($rutas[0]) {
                         ResponseHelper::badRequest("Token requerido");
                     }
                     $alumnos->buscarPorToken($datos["token"]);
+                } catch (Exception $e) {
+                    ResponseHelper::badRequest($e->getMessage());
+                }
+            } else {
+                ResponseHelper::methodNotAllowed();
+            }
+        } elseif (isset($rutas[1]) && $rutas[1] === 'token') {
+            // /alumnos/token - POST: obtener token por DNI (sin autenticación)
+            if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+                try {
+                    $datos = ValidationHelper::validateJsonInput(file_get_contents("php://input"));
+                    $alumnos->getTokenByDNI($datos);
                 } catch (Exception $e) {
                     ResponseHelper::badRequest($e->getMessage());
                 }

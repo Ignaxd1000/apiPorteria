@@ -201,16 +201,28 @@ class ValidationHelper {
         
         return $data;
     }
-
-    public static function validateKey($key) {
-        if (empty($key) {
-            throw new Exception("Error de clave");
-            }
-
-        /** Deberia añadir la verificación del OAuth acá, pero para eso hay que esperar a Amdel **/
-         return True;
-
+    
+    /**
+     * Authenticate client credentials
+     * @param string $id_cliente Client ID (hashed username - received as hash)
+     * @param string $llave_secreta Secret key (hashed password - received as hash)
+     * @return bool True if authentication succeeds
+     * @throws Exception if authentication fails
+     */
+    public static function authenticateClient($id_cliente, $llave_secreta) {
+        if (empty($id_cliente) || empty($llave_secreta)) {
+            throw new Exception("Credenciales requeridas");
         }
+        
+        require_once __DIR__ . '/../models/clientes.modelo.php';
+        
+        $cliente = ModeloClientes::getClientByCredentials($id_cliente, $llave_secreta);
+        
+        if (!$cliente) {
+            throw new Exception("Credenciales inválidas");
+        }
+        
+        return true;
     }
 }
 
