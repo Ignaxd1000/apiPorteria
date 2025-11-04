@@ -22,7 +22,8 @@ $publicRoutes = [
 
 // Verificar si la ruta actual es pública - optimized route matching
 $currentRouteKey = $_SERVER['REQUEST_METHOD'] . ':/' . implode('/', array_slice($rutas, 0, 2));
-$isPublicRoute = isset($publicRoutes[$currentRouteKey]) || isset($publicRoutes[$_SERVER['REQUEST_METHOD'] . ':/' . ($rutas[0] ?? '')]);
+$currentRouteKeySingle = $_SERVER['REQUEST_METHOD'] . ':/' . ($rutas[0] ?? '');
+$isPublicRoute = isset($publicRoutes[$currentRouteKey]) || isset($publicRoutes[$currentRouteKeySingle]);
 
 
 // Autenticación: validar credenciales si no es una ruta pública
@@ -81,24 +82,36 @@ if (!in_array($rutas[0], $validRoutes)) {
 }
 
 // Helper function to handle JSON input with caching
+// Note: This caches the parsed input since $rawInput is constant per request
 function getJsonInput($rawInput) {
     static $parsedInput = null;
-    if ($parsedInput === null) {
+    static $cachedRawInput = null;
+    
+    // Only use cache if we're parsing the same raw input
+    if ($cachedRawInput !== $rawInput) {
+        $cachedRawInput = $rawInput;
         $parsedInput = ValidationHelper::validateJsonInput($rawInput);
     }
+    
     return $parsedInput;
 }
 
 // Helper function to handle PUT data with caching
+// Note: This caches the parsed input since $rawInput is constant per request
 function getPutData($rawInput) {
     static $putData = null;
-    if ($putData === null) {
+    static $cachedRawInput = null;
+    
+    // Only use cache if we're parsing the same raw input
+    if ($cachedRawInput !== $rawInput) {
+        $cachedRawInput = $rawInput;
         parse_str($rawInput, $putData);
         if (empty($putData)) {
             // Try JSON format as fallback
             $putData = ValidationHelper::validateJsonInput($rawInput);
         }
     }
+    
     return $putData;
 }
 
