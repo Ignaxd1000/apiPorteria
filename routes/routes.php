@@ -2,20 +2,19 @@
 
 header('Content-Type: application/json');
 
-// Security: Maximum payload size (1MB)
+// Ajustar el límite máximo de tamaño del payload (1 MB)
 define('MAX_PAYLOAD_SIZE', 1048576);
 
-// Cache php://input as it can only be read once
-$rawInput = file_get_contents("php://input");
+// Leer entrada cruda para POST/PUT
+$rawInput = file_get_contents("php://input"); 
 
-// Helper function to handle JSON input with caching
-// Caches parsed JSON to avoid redundant json_decode() calls within the same request
-// (e.g., once in authentication validation, once in route handler)
+// Funcion helper para manejar entrada JSON con caching
+// Cacheado del parseo para evitar múltiples parseos en la misma petición
 function getJsonInput($rawInput) {
     static $parsedInput = null;
     static $cachedRawInput = null;
     
-    // Parse only if this is the first call or input has changed
+    // Parsear solo si es la primera llamada o la entrada ha cambiado
     if ($cachedRawInput !== $rawInput) {
         $cachedRawInput = $rawInput;
         $parsedInput = ValidationHelper::validateJsonInput($rawInput);
@@ -24,13 +23,13 @@ function getJsonInput($rawInput) {
     return $parsedInput;
 }
 
-// Helper function to handle PUT data with caching
-// Caches parsed data to avoid redundant parsing within the same request
+// Funcion helper para manejar entrada PUT con caching
+// Cacheado del parseo para evitar múltiples parseos en la misma petición
 function getPutData($rawInput) {
     static $putData = null;
     static $cachedRawInput = null;
     
-    // Parse only if this is the first call or input has changed
+    // Parsear solo si es la primera llamada o la entrada ha cambiado
     if ($cachedRawInput !== $rawInput) {
         $cachedRawInput = $rawInput;
         parse_str($rawInput, $putData);
@@ -49,20 +48,19 @@ $arrayRutas = array_values(array_filter(explode("/", $_SERVER['REQUEST_URI'])));
 $baseIndex = array_search('api29-main', $arrayRutas);
 $rutas = array_slice($arrayRutas, $baseIndex + 1);
 
-// Rutas que NO requieren autenticación - optimized with route keys for O(1) lookup
+// Rutas que NO requieren autenticación, cambiar según sea necesario
 $publicRoutes = [
     'POST:/alumnos/token' => true,  // Exactly 2 segments
     'POST:/clientes' => true        // Exactly 1 segment
 ];
 
-// Verificar si la ruta actual es pública - optimized route matching
-// Build route keys and check against public routes (only if rutas is not empty)
+// Verificar si la ruta actual es pública
 $isPublicRoute = false;
 if (!empty($rutas)) {
     $currentRouteKey2 = $_SERVER['REQUEST_METHOD'] . ':/' . implode('/', array_slice($rutas, 0, 2));
     $currentRouteKey1 = $_SERVER['REQUEST_METHOD'] . ':/' . $rutas[0];
     
-    // Check if current route matches public routes with correct depth
+    // Revisar si la ruta actual coincide con alguna ruta pública
     $isPublicRoute = (count($rutas) === 1 && isset($publicRoutes[$currentRouteKey1])) || 
                      (count($rutas) >= 2 && isset($publicRoutes[$currentRouteKey2]));
 }
@@ -123,7 +121,7 @@ if (!in_array($rutas[0], $validRoutes)) {
     ResponseHelper::notFound("Ruta no encontrada");
 }
 
-// Rutas principales
+// Acà arranca el enrutamiento principal
 switch ($rutas[0]) {
     case 'cursos':
         $cursos = new ControladorCursos();
